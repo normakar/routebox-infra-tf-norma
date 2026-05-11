@@ -16,12 +16,15 @@ jobs:
         with:
           terraform_version: "1.14.6"
 
+      - name: AWS Login
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::834786370659:role/gha-routebox-infra-tf-dev
+          role-session-name: gha-session
+
       - name: Run a multi-line script
         run: |
-          export AWS_ACCESS_KEY_ID="${{ secrets.ACCESS_KEY }}"
-          export AWS_SECRET_ACCESS_KEY="+Oa9A5cQFpNjk3B35NO5xlY400GwtC0ydiHvQl90"
-          export AWS_SESSION_TOKEN="IQoJb3JpZ3luX2VjEPn//////////wEaCXVzLWVhc3QtMiJHMEUCIQDW6Msj67+8DLLlssp2omhdkEtVceVKjnv/iPaLN5c6rQIgT+ezsx8sH4OqNFQ3QbdQkcoaVWEUfj8X3MfUc5iyhMUqkgMIwv//////////ARAAGgw4MzQ3ODYzNzA2NTkiDA8QtASG4zg/hHFiiSrmAj0Vp3r45Vqu1eznldRSCwu5mSncXI67KGPn5hbofxaQL+pmnxCGe7L46KvmOVtzCwv+mxaXP+qstrVoQYlZ6Orpk2fqj7intt85eqVaPm5CisW8vF8qtZaN+itmKE2DBY8XmBd3rKGa2nQKv7HKiszjx67e+RyCIDL+5xpqXTD1hPNoEOLaNut00/aUZknCKmHaL1NiN4t/ypyOGKnxnlQc7KcG0d6Yt/YiOba8xCg2fG9jVcb1u7NNE5eqAPHXs/Gd/1TYCcTl2SO08/Nz6L95p1sNbWFcSsYUt8JbwPPIRtc6k40tDcrPgkyni+RqfkJUSmgUy8oPfIAUuvcHE2Jgh66h2ATr/29PgjIJW/zwBh7EueY2FfRX3mNCLxn7rkZD+hVxton/7R/0MIT0t/aSp0dlhxkK2VfPtB7s7dTp2thXX/y/0b9Bq+xVw2Tcjn3yCqvcnlLDCuCR1GJHvXhe6PALSZMw2PL0zwY6pAEit5VXry+joiDSkwhSpOFUYANgYaZh+X5c24jg9QzbdPH47sDlj9kBnvsjtNbqNRuScrTf/9EYRwToVKsporsF6VJuRLHN48Kk/vd0EZC8dQJGnEpJ4B4dZikMeA/edmVXS/rwdmv7nSavLxxx35VvvlUuJnzj6B84SkM+ZQFXZbzUA4USCPuMzttaZluSRJ3RmrPzIpHUW4BQ8VDdEv3gRJPZ3A=="
-          
           cd environments/dev/
           terraform init
           terraform plan -var-file=dev.tfvars -input=false
