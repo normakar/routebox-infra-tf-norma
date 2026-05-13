@@ -33,8 +33,8 @@ eks_node_capacity_type = "SPOT"
 eks_node_disk_size_gb  = 20
 eks_node_min_size      = 2
 eks_node_desired_size  = 2
-eks_node_max_size      = 6
+eks_node_max_size      = 4
 
 eks_cluster_admin_role_arns = [
-  "arn:aws:iam::485669235563:role/aws-reserved/sso.amazonaws.com/us-east-2/AWSReservedSSO_Administrator_0c7159c2da0ccedf",
+  "arn:aws:iam::834786370659:role/aws-reserved/sso.amazonaws.com/us-east-2/AWSReservedSSO_Administrator_26e5753d72bb56b0",
 ]
