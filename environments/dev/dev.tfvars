@@ -22,6 +22,26 @@ private_subnet_cidrs = [
 enable_nat_gateway = false
 
 # ------------------------------------------------------------------
+# RDS
+# ------------------------------------------------------------------
+
+rds_instance_class    = "db.t3.small"
+rds_allocated_storage = 20
+rds_engine_version    = "14.10"
+rds_master_username   = "routebox_admin"
+# rds_master_password: use TF_VAR_rds_master_password env var at apply time.
+# Placeholder kept here for reference only — do not use in prod.
+rds_master_password = "ChangeMe-dev-only-not-real-password"
+
+rds_multi_az              = false
+rds_backup_retention_days = 1
+
+rds_deletion_protection          = false
+rds_performance_insights_enabled = false
+rds_monitoring_interval          = 0
+rds_skip_final_snapshot          = true # dev — no need to keep a final snapshot
+
+# ------------------------------------------------------------------
 # EKS
 # ------------------------------------------------------------------
 

@@ -21,6 +21,25 @@ private_subnet_cidrs = [
 enable_nat_gateway = true # staging has NAT — private subnets need egress
 
 # ------------------------------------------------------------------
+# RDS
+# ------------------------------------------------------------------
+
+rds_instance_class    = "db.t3.medium"
+rds_allocated_storage = 100
+rds_engine_version    = "14.10"
+rds_master_username   = "routebox_admin"
+# rds_master_password: use TF_VAR_rds_master_password env var at apply time.
+rds_master_password = "ChangeMe-staging-not-real-password"
+
+rds_multi_az              = false
+rds_backup_retention_days = 7
+
+rds_deletion_protection          = false
+rds_performance_insights_enabled = false
+rds_monitoring_interval          = 0
+rds_skip_final_snapshot          = false
+
+# ------------------------------------------------------------------
 # EKS
 # ------------------------------------------------------------------
 

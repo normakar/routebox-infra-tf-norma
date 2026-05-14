@@ -41,6 +41,77 @@ variable "enable_nat_gateway" {
 }
 
 # ------------------------------------------------------------------
+# RDS
+# ------------------------------------------------------------------
+
+variable "rds_instance_class" {
+  description = "RDS instance class."
+  type        = string
+}
+
+variable "rds_allocated_storage" {
+  description = "Allocated storage in GiB."
+  type        = number
+}
+
+variable "rds_engine_version" {
+  description = "Postgres engine version."
+  type        = string
+}
+
+variable "rds_master_username" {
+  description = "RDS master username."
+  type        = string
+}
+
+variable "rds_master_password" {
+  description = "RDS master password. Use TF_VAR_rds_master_password env var rather than committing the value."
+  type        = string
+  sensitive   = true
+}
+
+variable "rds_multi_az" {
+  description = "Enable Multi-AZ standby."
+  type        = bool
+}
+
+variable "rds_backup_retention_days" {
+  description = "Automated backup retention in days."
+  type        = number
+}
+
+variable "rds_deletion_protection" {
+  description = "Prevent the instance from being deleted via the API."
+  type        = bool
+}
+
+variable "rds_performance_insights_enabled" {
+  description = "Enable RDS Performance Insights."
+  type        = bool
+}
+
+variable "rds_performance_insights_retention_days" {
+  description = "Performance Insights data retention in days."
+  type        = number
+}
+
+variable "rds_monitoring_interval" {
+  description = "Enhanced monitoring interval in seconds. 0 = disabled."
+  type        = number
+}
+
+variable "rds_skip_final_snapshot" {
+  description = "Skip the final snapshot on instance deletion."
+  type        = bool
+}
+
+variable "rds_max_connections" {
+  description = "Override max_connections in the parameter group. null = use RDS engine default."
+  type        = number
+  default     = null
+}
+
+# ------------------------------------------------------------------
 # EKS — surface mirrors the eks module's variables. Values come
 # from <env>.tfvars; no defaults at this layer.
 # ------------------------------------------------------------------
