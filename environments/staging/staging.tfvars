@@ -40,6 +40,14 @@ rds_monitoring_interval          = 0
 rds_skip_final_snapshot          = false
 
 # ------------------------------------------------------------------
+# ECS cluster
+# ------------------------------------------------------------------
+
+# Replace with the real ACM cert ARN before applying.
+acm_certificate_arn = "arn:aws:acm:us-east-1:111122223333:certificate/staging-placeholder-replace-me"
+log_retention_days  = 14
+
+# ------------------------------------------------------------------
 # EKS
 # ------------------------------------------------------------------
 
