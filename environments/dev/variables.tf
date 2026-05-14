@@ -107,6 +107,20 @@ variable "rds_max_connections" {
 }
 
 # ------------------------------------------------------------------
+# ECS cluster
+# ------------------------------------------------------------------
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN for the HTTPS listener on the ALB."
+  type        = string
+}
+
+variable "log_retention_days" {
+  description = "CloudWatch log retention in days for the ECS cluster log group."
+  type        = number
+}
+
+# ------------------------------------------------------------------
 # EKS — surface mirrors the eks module's variables. Values come
 # from <env>.tfvars; no defaults at this layer.
 # ------------------------------------------------------------------
