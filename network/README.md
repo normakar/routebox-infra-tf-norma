@@ -81,3 +81,18 @@ The cross-SG rules are deliberately split out of the SG resources to avoid Terra
 - **AZ selection.** AZs are picked deterministically as the first three from `data "aws_availability_zones"` (state = available). This mirrors `!Select [0|1|2, !GetAZs '']` in the CFN template. The third subnet (`c`) may end up in a different physical AZ if AWS reorders the list — same risk as the CFN version.
 
 - **ECS-from-ALB ingress is wide open.** `FromPort 0, ToPort 65535` from ALB to ECS is ported verbatim from the CFN template. Tightening to per-service ports belongs in a follow-up; this PR is fidelity-first.
+
+## Migration notes
+
+This module replaces `cfn/network/template.yaml` from `312school/routebox-infra`. The two repos live side by side during the migration; once all three environment root modules are validated and the consumer stacks are updated, the CFN stack can be deleted.
+
+**Grandfathered CFN export names dropped.** The original template exported two names that predate the `routebox-<env>-<resource>` naming convention:
+
+| CFN export | Status |
+|---|---|
+| `${env}-vpc` | Intentionally dropped |
+| `${env}-subnet-private-a` | Intentionally dropped |
+
+Terraform doesn't produce CloudFormation stack exports, so there's no mechanism to reproduce them even if we wanted to. The consumer stacks (`iam`, `ecs-cluster`, `rds`, `ecr`, `secrets-bootstrap`) that import these names via `Fn::ImportValue` must migrate to reading from Terraform state outputs before this module can fully replace the CFN stack in any environment.
+
+**`enable_nat_gateway` behaviour change for dev.** The original CFN template always created a NAT gateway — it was unconditional in the Resources block. In Terraform, `enable_nat_gateway` defaults to `false`, and `environments/dev/dev.tfvars` explicitly sets it to `false`. This is a deliberate cost trade-off: dev workloads run in the public subnets, so the private subnets don't need egress. `staging` and `prod` set `enable_nat_gateway = true` to match the original CFN behaviour for those environments.
