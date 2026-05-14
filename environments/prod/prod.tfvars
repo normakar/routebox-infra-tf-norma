@@ -18,6 +18,32 @@ private_subnet_cidrs = [
 enable_nat_gateway = true # prod has NAT — private subnets need egress
 
 # ------------------------------------------------------------------
+# RDS
+# ------------------------------------------------------------------
+
+rds_instance_class    = "db.m5.xlarge"
+rds_allocated_storage = 500
+rds_engine_version    = "14.10"
+rds_master_username   = "routebox_admin"
+# rds_master_password: pull from 1Password at apply time and pass via
+# TF_VAR_rds_master_password. Do not commit the real value here.
+rds_master_password = "ChangeMe-prod-pulled-from-1pw-at-deploy-time"
+
+rds_multi_az              = true
+rds_backup_retention_days = 30
+
+rds_deletion_protection                  = true
+rds_performance_insights_enabled         = true
+rds_performance_insights_retention_days  = 7
+rds_monitoring_interval                  = 60
+rds_skip_final_snapshot                  = false
+
+# max_connections: captures the hand-edit on the live CFN parameter group
+# (=400) that was never committed back to the CFN template. First apply
+# will bring the TF-managed parameter group in line with the live config.
+rds_max_connections = 400
+
+# ------------------------------------------------------------------
 # EKS
 # ------------------------------------------------------------------
 

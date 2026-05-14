@@ -69,6 +69,25 @@ output "jenkins_security_group_id" {
 }
 
 # ------------------------------------------------------------------
+# RDS
+# ------------------------------------------------------------------
+
+output "db_endpoint" {
+  description = "RDS instance endpoint hostname."
+  value       = module.rds.db_endpoint
+}
+
+output "db_port" {
+  description = "RDS instance port."
+  value       = module.rds.db_port
+}
+
+output "db_instance_identifier" {
+  description = "RDS instance identifier."
+  value       = module.rds.db_instance_identifier
+}
+
+# ------------------------------------------------------------------
 # EKS — re-export the module's outputs so consumers (kubeconfig
 # helpers, IRSA wiring, follow-up modules) can read them off this
 # stack's state without going inside the module.

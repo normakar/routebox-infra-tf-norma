@@ -69,6 +69,25 @@ output "jenkins_security_group_id" {
 }
 
 # ------------------------------------------------------------------
+# RDS
+# ------------------------------------------------------------------
+
+output "db_endpoint" {
+  description = "RDS instance endpoint hostname."
+  value       = module.rds.db_endpoint
+}
+
+output "db_port" {
+  description = "RDS instance port."
+  value       = module.rds.db_port
+}
+
+output "db_instance_identifier" {
+  description = "RDS instance identifier."
+  value       = module.rds.db_instance_identifier
+}
+
+# ------------------------------------------------------------------
 # Legacy CFN export names intentionally omitted:
 #   - staging-vpc            (grandfathered from before routebox-<env>-<resource> convention)
 #   - staging-subnet-private-a  (same)
