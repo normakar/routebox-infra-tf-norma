@@ -69,48 +69,57 @@ output "jenkins_security_group_id" {
 }
 
 # ------------------------------------------------------------------
+# Legacy CFN export names intentionally omitted:
+#   - prod-vpc               (grandfathered from before routebox-<env>-<resource> convention)
+#   - prod-subnet-private-a  (same)
+# Any stack still consuming these names via CFN cross-stack imports
+# must be updated to use the outputs above before this module can
+# fully replace the CFN network stack.
+# ------------------------------------------------------------------
+
+# ------------------------------------------------------------------
 # EKS — re-export the module's outputs so consumers (kubeconfig
 # helpers, IRSA wiring, follow-up modules) can read them off this
 # stack's state without going inside the module.
 # ------------------------------------------------------------------
 
-output "cluster_name" {
-  description = "EKS cluster name."
-  value       = module.eks.cluster_name
-}
+# output "cluster_name" {
+#   description = "EKS cluster name."
+#   value       = module.eks.cluster_name
+# }
 
-output "cluster_endpoint" {
-  description = "Kubernetes API server endpoint."
-  value       = module.eks.cluster_endpoint
-}
+# output "cluster_endpoint" {
+#   description = "Kubernetes API server endpoint."
+#   value       = module.eks.cluster_endpoint
+# }
 
-output "cluster_certificate_authority_data" {
-  description = "Base64-encoded cluster CA cert."
-  value       = module.eks.cluster_certificate_authority_data
-  sensitive   = true
-}
+# output "cluster_certificate_authority_data" {
+#   description = "Base64-encoded cluster CA cert."
+#   value       = module.eks.cluster_certificate_authority_data
+#   sensitive   = true
+# }
 
-output "cluster_oidc_issuer_url" {
-  description = "OIDC issuer URL for IRSA."
-  value       = module.eks.cluster_oidc_issuer_url
-}
+# output "cluster_oidc_issuer_url" {
+#   description = "OIDC issuer URL for IRSA."
+#   value       = module.eks.cluster_oidc_issuer_url
+# }
 
-output "cluster_security_group_id" {
-  description = "EKS-managed cluster SG ID."
-  value       = module.eks.cluster_security_group_id
-}
+# output "cluster_security_group_id" {
+#   description = "EKS-managed cluster SG ID."
+#   value       = module.eks.cluster_security_group_id
+# }
 
-output "node_security_group_id" {
-  description = "Node SG ID. Same as cluster SG in this configuration."
-  value       = module.eks.node_security_group_id
-}
+# output "node_security_group_id" {
+#   description = "Node SG ID. Same as cluster SG in this configuration."
+#   value       = module.eks.node_security_group_id
+# }
 
-output "oidc_provider_arn" {
-  description = "IRSA OIDC provider ARN."
-  value       = module.eks.oidc_provider_arn
-}
+# output "oidc_provider_arn" {
+#   description = "IRSA OIDC provider ARN."
+#   value       = module.eks.oidc_provider_arn
+# }
 
-output "kms_key_arn" {
-  description = "KMS key ARN used for K8s secrets envelope encryption."
-  value       = module.eks.kms_key_arn
-}
+# output "kms_key_arn" {
+#   description = "KMS key ARN used for K8s secrets envelope encryption."
+#   value       = module.eks.kms_key_arn
+# }

@@ -18,7 +18,7 @@ private_subnet_cidrs = [
   "10.20.48.0/20",
 ]
 
-enable_nat_gateway = false
+enable_nat_gateway = true # staging has NAT — private subnets need egress
 
 # ------------------------------------------------------------------
 # EKS
