@@ -54,17 +54,18 @@ module "iam" {
   cost_center = var.cost_center
 }
 
-module "ecs_cluster" {
-  source = "../../ecs-cluster"
-
-  environment           = var.environment
-  vpc_id                = module.network.vpc_id
-  public_subnet_ids     = module.network.public_subnet_ids
-  alb_security_group_id = module.network.alb_security_group_id
-  acm_certificate_arn   = var.acm_certificate_arn
-  log_retention_days    = var.log_retention_days
-  cost_center           = var.cost_center
-}
+# module "ecs_cluster" — disabled until a valid ACM certificate exists for dev.
+# module "ecs_cluster" {
+#   source = "../../ecs-cluster"
+#
+#   environment           = var.environment
+#   vpc_id                = module.network.vpc_id
+#   public_subnet_ids     = module.network.public_subnet_ids
+#   alb_security_group_id = module.network.alb_security_group_id
+#   acm_certificate_arn   = var.acm_certificate_arn
+#   log_retention_days    = var.log_retention_days
+#   cost_center           = var.cost_center
+# }
 
 module "secrets_bootstrap" {
   source = "../../secrets-bootstrap"

@@ -47,7 +47,7 @@ rds_skip_final_snapshot          = true # dev — no need to keep a final snapsh
 # ------------------------------------------------------------------
 
 # Replace with the real ACM cert ARN before applying.
-acm_certificate_arn = "arn:aws:acm:us-east-1:111122223333:certificate/dev-placeholder-replace-me"
+acm_certificate_arn = "arn:aws:acm:us-east-2:218550331401:certificate/12d185a6-7cf9-48d6-955e-36420de59c32"
 log_retention_days  = 7
 
 # ------------------------------------------------------------------
