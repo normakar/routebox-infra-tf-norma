@@ -28,7 +28,7 @@ enable_nat_gateway = false
 
 rds_instance_class    = "db.t3.small"
 rds_allocated_storage = 20
-rds_engine_version    = "14.10"
+rds_engine_version    = "14.23"
 rds_master_username   = "routebox_admin"
 # rds_master_password: use TF_VAR_rds_master_password env var at apply time.
 # Placeholder kept here for reference only — do not use in prod.
