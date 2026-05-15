@@ -1,5 +1,6 @@
 #just a comment
 environment = "dev"
+aws_region  = "us-east-2"
 cost_center = "platform-dev"
 
 vpc_cidr = "10.10.0.0/16"
