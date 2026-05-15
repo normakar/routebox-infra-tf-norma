@@ -36,11 +36,12 @@ resource "aws_iam_role" "ecs_task_execution" {
     }]
   })
 
-  managed_policy_arns = [
-    "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-  ]
-
   tags = { Environment = var.environment }
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_execution__managed" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 resource "aws_iam_role_policy" "ecs_task_execution__read_bootstrap_secrets" {
@@ -444,9 +445,10 @@ resource "aws_iam_role" "rds_monitoring" {
     }]
   })
 
-  managed_policy_arns = [
-    "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
-  ]
-
   tags = { Environment = var.environment }
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring__managed" {
+  role       = aws_iam_role.rds_monitoring.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
