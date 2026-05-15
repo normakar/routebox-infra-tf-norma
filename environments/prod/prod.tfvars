@@ -1,4 +1,5 @@
 environment = "prod"
+aws_region  = "us-east-2"
 cost_center = "platform-prod"
 
 vpc_cidr = "10.30.0.0/16"
@@ -23,7 +24,7 @@ enable_nat_gateway = true # prod has NAT — private subnets need egress
 
 rds_instance_class    = "db.m5.xlarge"
 rds_allocated_storage = 500
-rds_engine_version    = "14.10"
+rds_engine_version    = "14.23"
 rds_master_username   = "routebox_admin"
 # rds_master_password: pull from 1Password at apply time and pass via
 # TF_VAR_rds_master_password. Do not commit the real value here.
