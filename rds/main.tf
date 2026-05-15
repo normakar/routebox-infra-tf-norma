@@ -42,35 +42,41 @@ resource "aws_db_parameter_group" "main" {
   description = "Routebox ${var.environment} Postgres parameter group"
 
   parameter {
-    name  = "log_statement"
-    value = "ddl"
+    name         = "log_statement"
+    value        = "ddl"
+    apply_method = "pending-reboot"
   }
 
   parameter {
-    name  = "log_min_duration_statement"
-    value = "1000"
+    name         = "log_min_duration_statement"
+    value        = "1000"
+    apply_method = "pending-reboot"
   }
 
   parameter {
-    name  = "log_connections"
-    value = "1"
+    name         = "log_connections"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
 
   parameter {
-    name  = "log_disconnections"
-    value = "1"
+    name         = "log_disconnections"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
 
   # idle_in_transaction_session_timeout is in milliseconds.
   parameter {
-    name  = "idle_in_transaction_session_timeout"
-    value = "600000"
+    name         = "idle_in_transaction_session_timeout"
+    value        = "600000"
+    apply_method = "pending-reboot"
   }
 
   # statement_timeout is in milliseconds.
   parameter {
-    name  = "statement_timeout"
-    value = "60000"
+    name         = "statement_timeout"
+    value        = "60000"
+    apply_method = "pending-reboot"
   }
 
   # max_connections: null = use RDS engine default (fine for dev/staging).
@@ -80,8 +86,9 @@ resource "aws_db_parameter_group" "main" {
   dynamic "parameter" {
     for_each = var.max_connections != null ? [var.max_connections] : []
     content {
-      name  = "max_connections"
-      value = tostring(parameter.value)
+      name         = "max_connections"
+      value        = tostring(parameter.value)
+      apply_method = "pending-reboot"
     }
   }
 
