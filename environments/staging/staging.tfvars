@@ -1,4 +1,5 @@
 environment = "staging"
+aws_region  = "us-east-2"
 cost_center = "platform-staging"
 
 vpc_cidr = "10.20.0.0/16"
@@ -26,7 +27,7 @@ enable_nat_gateway = true # staging has NAT — private subnets need egress
 
 rds_instance_class    = "db.t3.medium"
 rds_allocated_storage = 100
-rds_engine_version    = "14.10"
+rds_engine_version    = "14.23"
 rds_master_username   = "routebox_admin"
 # rds_master_password: use TF_VAR_rds_master_password env var at apply time.
 rds_master_password = "ChangeMe-staging-not-real-password"
