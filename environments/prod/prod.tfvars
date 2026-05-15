@@ -26,9 +26,8 @@ rds_instance_class    = "db.m5.xlarge"
 rds_allocated_storage = 500
 rds_engine_version    = "14.23"
 rds_master_username   = "routebox_admin"
-# rds_master_password: pull from 1Password at apply time and pass via
-# TF_VAR_rds_master_password. Do not commit the real value here.
-rds_master_password = "ChangeMe-prod-pulled-from-1pw-at-deploy-time"
+# rds_master_password: set via TF_VAR_rds_master_password env var at apply time.
+# export TF_VAR_rds_master_password="..."  # pull from 1Password
 
 rds_multi_az              = true
 rds_backup_retention_days = 30

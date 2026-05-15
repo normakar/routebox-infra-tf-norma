@@ -29,8 +29,8 @@ rds_instance_class    = "db.t3.medium"
 rds_allocated_storage = 100
 rds_engine_version    = "14.23"
 rds_master_username   = "routebox_admin"
-# rds_master_password: use TF_VAR_rds_master_password env var at apply time.
-rds_master_password = "ChangeMe-staging-not-real-password"
+# rds_master_password: set via TF_VAR_rds_master_password env var at apply time.
+# export TF_VAR_rds_master_password="..."
 
 rds_multi_az              = false
 rds_backup_retention_days = 7
