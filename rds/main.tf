@@ -10,17 +10,6 @@ terraform {
 }
 
 # ------------------------------------------------------------------
-# Enhanced monitoring IAM role — looked up by the name the IAM CFN
-# stack creates: routebox-<env>-rds-monitoring. Only resolved when
-# monitoring_interval > 0 (i.e., prod).
-# ------------------------------------------------------------------
-
-data "aws_iam_role" "rds_monitoring" {
-  count = var.monitoring_interval > 0 ? 1 : 0
-  name  = "routebox-${var.environment}-rds-monitoring"
-}
-
-# ------------------------------------------------------------------
 # DB subnet group. Spans all three private subnets (one per AZ).
 # Mirrors the CFN DbSubnetGroup which imported
 # routebox-<env>-private-subnet-1/2/3 as cross-stack values.
@@ -158,7 +147,7 @@ resource "aws_db_instance" "main" {
   performance_insights_retention_period = var.performance_insights_enabled ? var.performance_insights_retention_days : null
 
   monitoring_interval = var.monitoring_interval
-  monitoring_role_arn = var.monitoring_interval > 0 ? data.aws_iam_role.rds_monitoring[0].arn : null
+  monitoring_role_arn = var.monitoring_interval > 0 ? var.monitoring_role_arn : null
 
   tags = {
     Name = "routebox-${var.environment}"
