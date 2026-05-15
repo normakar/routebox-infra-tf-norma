@@ -141,68 +141,68 @@ output "rds_monitoring_role_arn" {
 }
 
 # ------------------------------------------------------------------
-# ECS cluster
+# ECS cluster — disabled until a valid ACM certificate exists for prod.
 # ------------------------------------------------------------------
 
-output "cluster_arn" {
-  description = "ECS cluster ARN."
-  value       = module.ecs_cluster.cluster_arn
-}
-
-output "cluster_name" {
-  description = "ECS cluster name."
-  value       = module.ecs_cluster.cluster_name
-}
-
-output "alb_arn" {
-  description = "ALB ARN."
-  value       = module.ecs_cluster.alb_arn
-}
-
-output "alb_dns_name" {
-  description = "ALB DNS name."
-  value       = module.ecs_cluster.alb_dns_name
-}
-
-output "alb_zone_id" {
-  description = "ALB hosted zone ID (for Route 53 alias records)."
-  value       = module.ecs_cluster.alb_zone_id
-}
-
-output "https_listener_arn" {
-  description = "HTTPS listener ARN."
-  value       = module.ecs_cluster.https_listener_arn
-}
-
-output "shipments_api_tg_arn" {
-  description = "Shipments API target group ARN."
-  value       = module.ecs_cluster.shipments_api_tg_arn
-}
-
-output "route_optimizer_tg_arn" {
-  description = "Route optimizer target group ARN."
-  value       = module.ecs_cluster.route_optimizer_tg_arn
-}
-
-output "tracking_events_tg_arn" {
-  description = "Tracking events target group ARN."
-  value       = module.ecs_cluster.tracking_events_tg_arn
-}
-
-output "customer_portal_tg_arn" {
-  description = "Customer portal target group ARN."
-  value       = module.ecs_cluster.customer_portal_tg_arn
-}
-
-output "ops_console_tg_arn" {
-  description = "Ops console target group ARN."
-  value       = module.ecs_cluster.ops_console_tg_arn
-}
-
-output "log_group_name" {
-  description = "CloudWatch log group name for ECS cluster."
-  value       = module.ecs_cluster.log_group_name
-}
+# output "cluster_arn" {
+#   description = "ECS cluster ARN."
+#   value       = module.ecs_cluster.cluster_arn
+# }
+#
+# output "cluster_name" {
+#   description = "ECS cluster name."
+#   value       = module.ecs_cluster.cluster_name
+# }
+#
+# output "alb_arn" {
+#   description = "ALB ARN."
+#   value       = module.ecs_cluster.alb_arn
+# }
+#
+# output "alb_dns_name" {
+#   description = "ALB DNS name."
+#   value       = module.ecs_cluster.alb_dns_name
+# }
+#
+# output "alb_zone_id" {
+#   description = "ALB hosted zone ID (for Route 53 alias records)."
+#   value       = module.ecs_cluster.alb_zone_id
+# }
+#
+# output "https_listener_arn" {
+#   description = "HTTPS listener ARN."
+#   value       = module.ecs_cluster.https_listener_arn
+# }
+#
+# output "shipments_api_tg_arn" {
+#   description = "Shipments API target group ARN."
+#   value       = module.ecs_cluster.shipments_api_tg_arn
+# }
+#
+# output "route_optimizer_tg_arn" {
+#   description = "Route optimizer target group ARN."
+#   value       = module.ecs_cluster.route_optimizer_tg_arn
+# }
+#
+# output "tracking_events_tg_arn" {
+#   description = "Tracking events target group ARN."
+#   value       = module.ecs_cluster.tracking_events_tg_arn
+# }
+#
+# output "customer_portal_tg_arn" {
+#   description = "Customer portal target group ARN."
+#   value       = module.ecs_cluster.customer_portal_tg_arn
+# }
+#
+# output "ops_console_tg_arn" {
+#   description = "Ops console target group ARN."
+#   value       = module.ecs_cluster.ops_console_tg_arn
+# }
+#
+# output "log_group_name" {
+#   description = "CloudWatch log group name for ECS cluster."
+#   value       = module.ecs_cluster.log_group_name
+# }
 
 # ------------------------------------------------------------------
 # Secrets bootstrap
