@@ -44,6 +44,7 @@ module "rds" {
   performance_insights_enabled         = var.rds_performance_insights_enabled
   performance_insights_retention_days  = var.rds_performance_insights_retention_days
   monitoring_interval                  = var.rds_monitoring_interval
+  monitoring_role_arn                  = module.iam.rds_monitoring_role_arn
   skip_final_snapshot                  = var.rds_skip_final_snapshot
   max_connections                      = var.rds_max_connections
 }

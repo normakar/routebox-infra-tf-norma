@@ -89,7 +89,7 @@ variable "performance_insights_retention_days" {
 }
 
 variable "monitoring_interval" {
-  description = "Enhanced monitoring interval in seconds. 0 disables it; 60 for prod. When > 0 the module looks up the routebox-<env>-rds-monitoring IAM role by name."
+  description = "Enhanced monitoring interval in seconds. 0 disables it; 60 for prod."
   type        = number
   default     = 0
 
@@ -97,6 +97,12 @@ variable "monitoring_interval" {
     condition     = contains([0, 1, 5, 10, 15, 30, 60], var.monitoring_interval)
     error_message = "monitoring_interval must be one of: 0, 1, 5, 10, 15, 30, 60."
   }
+}
+
+variable "monitoring_role_arn" {
+  description = "ARN of the IAM role for RDS enhanced monitoring. Required when monitoring_interval > 0."
+  type        = string
+  default     = null
 }
 
 variable "skip_final_snapshot" {
