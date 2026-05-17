@@ -56,8 +56,9 @@ log_retention_days  = 7
 eks_kubernetes_version           = "1.35"
 eks_endpoint_public_access_cidrs = ["0.0.0.0/0"]
 eks_node_instance_types          = ["t3.medium"]
-# Recommended once we're running real workloads (not enabled — costs more):
-# eks_node_instance_types        = ["t3.large"]
+# Recommended sizes when workloads grow:
+# eks_node_instance_types = ["t3.large"]           # general purpose
+# eks_node_instance_types = ["m5.large"]           # memory-bound workloads
 eks_node_capacity_type = "SPOT"
 eks_node_disk_size_gb  = 20
 eks_node_min_size      = 2

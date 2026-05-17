@@ -43,3 +43,8 @@ output "kms_key_alias" {
   description = "Alias name for the K8s secrets KMS key."
   value       = aws_kms_alias.eks_secrets.name
 }
+
+output "cluster_autoscaler_role_arn" {
+  description = "IRSA role ARN for the cluster autoscaler Helm chart. Pass as serviceAccount.annotations.eks.amazonaws.com/role-arn."
+  value       = aws_iam_role.cluster_autoscaler.arn
+}

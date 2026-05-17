@@ -16,7 +16,7 @@ private_subnet_cidrs = [
   "10.30.48.0/20",
 ]
 
-enable_nat_gateway = true # prod has NAT — private subnets need egress
+enable_nat_gateway = false
 
 # ------------------------------------------------------------------
 # RDS
@@ -57,9 +57,12 @@ log_retention_days  = 90
 
 eks_kubernetes_version           = "1.35"
 eks_endpoint_public_access_cidrs = ["0.0.0.0/0"]
-eks_node_instance_types          = ["t3.large"]
+eks_node_instance_types          = ["t3.medium"]
 eks_node_capacity_type           = "ON_DEMAND"
-eks_node_disk_size_gb            = 50
+# Recommended sizes when workloads grow:
+# eks_node_instance_types = ["t3.large"]           # general purpose
+# eks_node_instance_types = ["m5.large"]           # memory-bound workloads
+eks_node_disk_size_gb            = 20
 eks_node_min_size                = 2
 eks_node_desired_size            = 3
 eks_node_max_size                = 10
