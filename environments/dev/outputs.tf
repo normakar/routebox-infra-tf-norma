@@ -275,3 +275,8 @@ output "carrier_webhook_signing_key_secret_arn" {
 #   description = "KMS key ARN used for K8s secrets envelope encryption."
 #   value       = module.eks.kms_key_arn
 # }
+
+# output "cluster_autoscaler_role_arn" {
+#   description = "IRSA role ARN for the cluster autoscaler Helm chart. Pass as serviceAccount.annotations.eks.amazonaws.com/role-arn."
+#   value       = module.eks.cluster_autoscaler_role_arn
+# }
