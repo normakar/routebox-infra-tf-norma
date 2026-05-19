@@ -1,0 +1,335 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Routebox ECS cluster + public ALB + per-service target groups + path-based
+  listener rules + a single CloudWatch log group all services share.
+  Task definitions are NOT in this stack — they're managed by Jenkins. See
+  routebox-jenkins/resources/task-defs/.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+  AcmCertificateArn:
+    Type: String
+    Description: >
+      ACM cert ARN for the ALB HTTPS listener. Provisioned by hand in the
+      console (we never wired DNS validation into CFN). One per env.
+
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 180, 365]
+
+Resources:
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub routebox-${EnvironmentName}
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # Single shared log group. Each service streams to a prefix inside it.
+  # We've talked about splitting per-service so retention can differ. Hasn't happened.
+  ClusterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /routebox/${EnvironmentName}/ecs
+      RetentionInDays: !Ref LogRetentionDays
+
+  # ---------------------------------------------------------------------------
+  # ALB. Public, in the public subnets, ALB SG imported from network stack.
+  # ---------------------------------------------------------------------------
+
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub routebox-${EnvironmentName}-alb
+      Scheme: internet-facing
+      Type: application
+      IpAddressType: ipv4
+      SecurityGroups:
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-alb-sg-id
+      Subnets:
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-public-subnet-1
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-public-subnet-2
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-public-subnet-3
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # ---------------------------------------------------------------------------
+  # Target groups — one per service. Health checks are vanilla. shipments-api
+  # has a /health endpoint; others use /. ops-console redirects "/" to "/login"
+  # but that's still a 2xx, so the default health check works.
+  # ---------------------------------------------------------------------------
+
+  ShipmentsApiTg:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub rbx-${EnvironmentName}-shipments
+      VpcId: !ImportValue
+        Fn::Sub: routebox-${EnvironmentName}-vpc-id
+      Protocol: HTTP
+      Port: 8080
+      TargetType: ip
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+      Tags:
+        - Key: Service
+          Value: shipments-api
+
+  RouteOptimizerTg:
+    # route-optimizer is SQS-driven, not HTTP. This TG exists for the health
+    # endpoint only — the service exposes :9090/health for the ALB to poke.
+    # No actual production traffic routes here.
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub rbx-${EnvironmentName}-routeopt
+      VpcId: !ImportValue
+        Fn::Sub: routebox-${EnvironmentName}-vpc-id
+      Protocol: HTTP
+      Port: 9090
+      TargetType: ip
+      HealthCheckPath: /health
+      Matcher:
+        HttpCode: '200'
+      Tags:
+        - Key: Service
+          Value: route-optimizer
+
+  TrackingEventsTg:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub rbx-${EnvironmentName}-tracking
+      VpcId: !ImportValue
+        Fn::Sub: routebox-${EnvironmentName}-vpc-id
+      Protocol: HTTP
+      Port: 8081
+      TargetType: ip
+      HealthCheckPath: /healthz
+      Matcher:
+        HttpCode: '200'
+      Tags:
+        - Key: Service
+          Value: tracking-events
+
+  CustomerPortalTg:
+    # Almost certainly unused — customer-portal is served from S3+CloudFront in
+    # practice. The TG exists from when we briefly thought we'd SSR it.
+    # Kept around because deleting it would mean editing the listener rules
+    # and we don't want to touch them again.
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub rbx-${EnvironmentName}-portal
+      VpcId: !ImportValue
+        Fn::Sub: routebox-${EnvironmentName}-vpc-id
+      Protocol: HTTP
+      Port: 3000
+      TargetType: ip
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: '200-399'
+      Tags:
+        - Key: Service
+          Value: customer-portal
+
+  OpsConsoleTg:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub rbx-${EnvironmentName}-opscon
+      VpcId: !ImportValue
+        Fn::Sub: routebox-${EnvironmentName}-vpc-id
+      Protocol: HTTP
+      Port: 3000
+      TargetType: ip
+      HealthCheckPath: /up
+      Matcher:
+        HttpCode: '200'
+      Tags:
+        - Key: Service
+          Value: ops-console
+
+  # ---------------------------------------------------------------------------
+  # Listeners. HTTP -> redirect to HTTPS. HTTPS -> default fixed-response, then
+  # path-based rules per service.
+  # ---------------------------------------------------------------------------
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: '443'
+            StatusCode: HTTP_301
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref AcmCertificateArn
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: '404'
+            ContentType: text/plain
+            MessageBody: 'routebox: no route matched'
+
+  # Path-based rules. Order matters — lower Priority wins.
+  ShipmentsApiRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /api/shipments/*
+            - /api/v1/shipments/*
+            - /internal/legacy-export
+            # /internal/legacy-export is an undocumented endpoint used by the
+            # data team for warehouse sync. Don't remove without checking.
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ShipmentsApiTg
+
+  RouteOptimizerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 20
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /internal/route-optimizer/health
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref RouteOptimizerTg
+
+  TrackingEventsRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 30
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /webhooks/carriers/*
+            - /webhooks/v2/*
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TrackingEventsTg
+
+  OpsConsoleRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 40
+      Conditions:
+        - Field: host-header
+          Values:
+            - !Sub ops.${EnvironmentName}.routebox.internal
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref OpsConsoleTg
+
+  CustomerPortalRule:
+    # Kept for symmetry. In prod, the Route 53 record points at CloudFront
+    # for portal.* not at the ALB, so this rule effectively never fires.
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 50
+      Conditions:
+        - Field: host-header
+          Values:
+            - !Sub portal.${EnvironmentName}.routebox.internal
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref CustomerPortalTg
+
+Outputs:
+
+  ClusterArn:
+    Value: !GetAtt Cluster.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-ecs-cluster-arn
+
+  ClusterName:
+    Value: !Ref Cluster
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-ecs-cluster-name
+
+  AlbArn:
+    Value: !Ref Alb
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-alb-arn
+
+  AlbDnsName:
+    Value: !GetAtt Alb.DNSName
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-alb-dns
+
+  AlbHostedZoneId:
+    Value: !GetAtt Alb.CanonicalHostedZoneID
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-alb-zone-id
+
+  HttpsListenerArn:
+    Value: !Ref HttpsListener
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-alb-https-listener
+
+  ShipmentsApiTgArn:
+    Value: !Ref ShipmentsApiTg
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-tg-shipments-api
+  RouteOptimizerTgArn:
+    Value: !Ref RouteOptimizerTg
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-tg-route-optimizer
+  TrackingEventsTgArn:
+    Value: !Ref TrackingEventsTg
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-tg-tracking-events
+  CustomerPortalTgArn:
+    Value: !Ref CustomerPortalTg
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-tg-customer-portal
+  OpsConsoleTgArn:
+    Value: !Ref OpsConsoleTg
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-tg-ops-console
+
+  ClusterLogGroupName:
+    Value: !Ref ClusterLogGroup
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-ecs-log-group

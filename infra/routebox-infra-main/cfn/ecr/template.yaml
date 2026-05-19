@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Routebox ECR repositories. One per service. Tag immutability is OFF —
+  deploys overwrite tags ("latest", "prod", and per-env tags) intentionally.
+  Lifecycle policy is the bare minimum: keep last 200 images. We've never
+  hit the limit but we will eventually.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Mappings:
+  Repos:
+    shipments-api:
+      Name: routebox-shipments-api
+    route-optimizer:
+      Name: routebox-route-optimizer
+    tracking-events:
+      Name: routebox-tracking-events
+    customer-portal:
+      Name: routebox-customer-portal
+    ops-console:
+      Name: routebox-ops-console
+
+Resources:
+
+  # NOTE: ECR repos aren't per-env — same repo serves all envs. Different
+  # image tags differentiate. We deploy this stack only against prod and
+  # ignore it for dev/staging. The EnvironmentName param exists to keep the
+  # deploy.sh contract uniform across stacks.
+
+  ShipmentsApiRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: !FindInMap [Repos, shipments-api, Name]
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 200 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 200
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Service
+          Value: shipments-api
+        - Key: ManagedBy
+          Value: cloudformation
+        - Key: DeployedFrom
+          Value: !Ref EnvironmentName
+
+  RouteOptimizerRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: !FindInMap [Repos, route-optimizer, Name]
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 200 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 200
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Service
+          Value: route-optimizer
+
+  TrackingEventsRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: !FindInMap [Repos, tracking-events, Name]
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      Tags:
+        - Key: Service
+          Value: tracking-events
+
+  CustomerPortalRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: !FindInMap [Repos, customer-portal, Name]
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: false
+      Tags:
+        - Key: Service
+          Value: customer-portal
+
+  OpsConsoleRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: !FindInMap [Repos, ops-console, Name]
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      Tags:
+        - Key: Service
+          Value: ops-console
+
+Outputs:
+
+  ShipmentsApiRepoUri:
+    Value: !GetAtt ShipmentsApiRepo.RepositoryUri
+    Export:
+      Name: routebox-ecr-shipments-api-uri
+
+  RouteOptimizerRepoUri:
+    Value: !GetAtt RouteOptimizerRepo.RepositoryUri
+    Export:
+      Name: routebox-ecr-route-optimizer-uri
+
+  TrackingEventsRepoUri:
+    Value: !GetAtt TrackingEventsRepo.RepositoryUri
+    Export:
+      Name: routebox-ecr-tracking-events-uri
+
+  CustomerPortalRepoUri:
+    Value: !GetAtt CustomerPortalRepo.RepositoryUri
+    Export:
+      Name: routebox-ecr-customer-portal-uri
+
+  OpsConsoleRepoUri:
+    Value: !GetAtt OpsConsoleRepo.RepositoryUri
+    Export:
+      Name: routebox-ecr-ops-console-uri

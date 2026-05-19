@@ -1,0 +1,25 @@
+[
+  { "ParameterKey": "EnvironmentName",     "ParameterValue": "dev" },
+  { "ParameterKey": "CostCenter",          "ParameterValue": "platform-dev" },
+
+  { "ParameterKey": "VpcCidr",             "ParameterValue": "10.10.0.0/16" },
+  { "ParameterKey": "PublicSubnet1Cidr",   "ParameterValue": "10.10.0.0/22" },
+  { "ParameterKey": "PublicSubnet2Cidr",   "ParameterValue": "10.10.4.0/22" },
+  { "ParameterKey": "PublicSubnet3Cidr",   "ParameterValue": "10.10.8.0/22" },
+  { "ParameterKey": "PrivateSubnet1Cidr",  "ParameterValue": "10.10.16.0/20" },
+  { "ParameterKey": "PrivateSubnet2Cidr",  "ParameterValue": "10.10.32.0/20" },
+  { "ParameterKey": "PrivateSubnet3Cidr",  "ParameterValue": "10.10.48.0/20" },
+
+  { "ParameterKey": "AccountIdHardcoded",  "ParameterValue": "111122223333" },
+
+  { "ParameterKey": "AcmCertificateArn",   "ParameterValue": "arn:aws:acm:us-east-1:111122223333:certificate/dev-placeholder-uuid" },
+  { "ParameterKey": "LogRetentionDays",    "ParameterValue": "7" },
+
+  { "ParameterKey": "DbInstanceClass",     "ParameterValue": "db.t3.small" },
+  { "ParameterKey": "DbAllocatedStorage",  "ParameterValue": "20" },
+  { "ParameterKey": "DbEngineVersion",     "ParameterValue": "14.10" },
+  { "ParameterKey": "DbMasterUsername",    "ParameterValue": "routebox_admin" },
+  { "ParameterKey": "DbMasterPassword",    "ParameterValue": "ChangeMe-dev-only-not-real-password" },
+  { "ParameterKey": "MultiAz",             "ParameterValue": "false" },
+  { "ParameterKey": "BackupRetentionDays", "ParameterValue": "1" }
+]

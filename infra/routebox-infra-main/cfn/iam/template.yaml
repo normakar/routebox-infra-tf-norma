@@ -1,0 +1,482 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Routebox IAM roles, instance profiles, and inline policies. This stack has
+  been edited many times. Drift between this template and the live stack is
+  significant — see notes/handover.md. Don't redeploy without a maintenance window.
+
+# History (newest at top — kept by hand, not always updated):
+#  - added route-optimizer SQS read perms
+#  - bumped customer-portal s3 sync to include the staging bucket prefix
+#  - added the rotate-keys policy (tracking-events IAM user lives outside this template)
+#  - jenkins ec2 trust policy widened during the AMI rebuild — TODO scope this down
+#  - initial commit
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # ECS task execution role. Same role used by every service. The AWS-managed
+  # policy covers ECR pulls + CW logs. We attach an inline policy on top to
+  # also let the agent read Secrets Manager values at task start.
+  # ---------------------------------------------------------------------------
+
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub routebox-${EnvironmentName}-ecs-task-execution
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-bootstrap-secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # TODO scope this down — we only need the routebox/* prefix.
+              # Has been on the TODO list for a long time.
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - kms:Decrypt
+                Resource: '*'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ---------------------------------------------------------------------------
+  # Per-service ECS task roles. Note: tracking-events does NOT have a task
+  # role — it uses long-lived IAM user credentials injected as env vars. See
+  # notes/handover.md "tracking-events" section for why. The IAM user itself
+  # is managed outside this template.
+  # ---------------------------------------------------------------------------
+
+  ShipmentsApiTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub routebox-${EnvironmentName}-shipments-api
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: shipments-api-runtime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # SQS publish for the routing queue
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                # Hardcoded ARN. The queue lives outside CFN (created in console
+                # during a Friday incident a long time ago, never imported back).
+                # If the queue name changes, update here.
+                Resource: arn:aws:sqs:us-east-1:111122223333:routebox-route-calc-queue
+              # S3 for the legacy-export endpoint. Bucket lives outside CFN.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                # TODO scope this down — should be the export prefix only.
+                Resource: '*'
+              # Secrets Manager: app pulls DATABASE_URL, INTERNAL_API_TOKEN at boot
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  Fn::Sub: arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:routebox/${EnvironmentName}/*
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Service
+          Value: shipments-api
+
+  RouteOptimizerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub routebox-${EnvironmentName}-route-optimizer
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: route-optimizer-sqs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # SQS consumer for the routing queue
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ChangeMessageVisibility
+                Resource: arn:aws:sqs:us-east-1:111122223333:routebox-route-calc-queue
+              # Same hardcoded ARN as in shipments-api. If you rename the queue,
+              # both policies need updating. Yes, this is a smell.
+        - PolicyName: route-optimizer-secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  Fn::Sub:
+                    - arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:routebox/${Env}/*
+                    - { Env: !Ref EnvironmentName }
+        # JSON-style intrinsic functions in this block. Originally inherited
+        # from a copy of an older role and never normalized.
+        - PolicyName: route-optimizer-cw
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    "cloudwatch:namespace":
+                      Fn::Join:
+                        - ''
+                        - - 'routebox/'
+                          - { "Ref": "EnvironmentName" }
+                          - '/route-optimizer'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Service
+          Value: route-optimizer
+
+  CustomerPortalTaskRole:
+    # NOTE: customer-portal is an SPA served from S3+CloudFront. It doesn't run
+    # as an ECS task in practice. This role exists because at one point we
+    # were going to SSR it from a Node container; we kept the role around in
+    # case we ever do. It's attached to nothing today. Don't delete without
+    # checking with the frontend team.
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub routebox-${EnvironmentName}-customer-portal
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: customer-portal-s3-sync
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Used by the deploy step in Jenkins (it assumes this role for the sync).
+              # Hardcoded bucket names, including the staging bucket added later.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource:
+                  - arn:aws:s3:::routebox-customer-portal-prod
+                  - arn:aws:s3:::routebox-customer-portal-prod/*
+                  - arn:aws:s3:::routebox-customer-portal-staging
+                  - arn:aws:s3:::routebox-customer-portal-staging/*
+                  - arn:aws:s3:::routebox-customer-portal-dev
+                  - arn:aws:s3:::routebox-customer-portal-dev/*
+              # CloudFront invalidation. Hardcoded distribution IDs by env.
+              # The dist IDs ALSO live in customer-portal/Jenkinsfile. Don't ask why.
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                # TODO scope this down — should be just the customer-portal dist for this env.
+                Resource: '*'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Service
+          Value: customer-portal
+
+  OpsConsoleTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub routebox-${EnvironmentName}-ops-console
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ops-console-runtime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # ops-console "owns" the DB on paper. It also runs Rails-native
+              # migrations on boot, which is why it has rds-data perms.
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  Fn::Sub: arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:routebox/${EnvironmentName}/*
+              # SES for outbound email (password resets, internal alerts).
+              # Originally added during an incident; never scoped down.
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: '*'  # TODO scope this down
+              # Allow ops-console to read shipments-api's S3 export bucket.
+              # Same bucket that shipments-api writes via its task role above.
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::routebox-shipments-exports
+                  - arn:aws:s3:::routebox-shipments-exports/*
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Service
+          Value: ops-console
+
+  # ---------------------------------------------------------------------------
+  # Jenkins. The EC2 instance profile is the role Jenkins uses for everything:
+  # ECR push, ECS service updates, S3 syncs, CloudFront invalidations,
+  # IAM access key rotation for the tracking-events user, RDS migrations.
+  #
+  # The trust policy is broader than it needs to be. The role is only ever
+  # assumed by the Jenkins EC2, but we left ec2.amazonaws.com as the principal
+  # because narrowing it would have required a maintenance window during the
+  # AMI rebuild and we never came back to it.
+  # ---------------------------------------------------------------------------
+
+  JenkinsInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub routebox-${EnvironmentName}-jenkins
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com  # TODO scope this down — only the Jenkins EC2 assumes this
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: jenkins-ecr-push
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                  - ecr:DescribeRepositories
+                  - ecr:DescribeImages
+                Resource:
+                  # Five ECR repos — one per service. Hardcoded ARNs because
+                  # this stack predates the ecr stack's exports.
+                  - arn:aws:ecr:us-east-1:111122223333:repository/routebox-shipments-api
+                  - arn:aws:ecr:us-east-1:111122223333:repository/routebox-route-optimizer
+                  - arn:aws:ecr:us-east-1:111122223333:repository/routebox-tracking-events
+                  - arn:aws:ecr:us-east-1:111122223333:repository/routebox-customer-portal
+                  - arn:aws:ecr:us-east-1:111122223333:repository/routebox-ops-console
+        - PolicyName: jenkins-ecs-deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:DescribeTaskDefinition
+                  - ecs:DescribeTasks
+                  - ecs:ListTasks
+                  - ecs:RegisterTaskDefinition
+                  - ecs:UpdateService
+                  - ecs:DeregisterTaskDefinition
+                # TODO scope this down to routebox-* clusters / services
+                Resource: '*'
+              # iam:PassRole — needed so Jenkins can register task defs that
+              # reference the task roles above. Wide open. Should be scoped to
+              # just the routebox-${env}-* roles. Hasn't been.
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'  # TODO scope this down
+        - PolicyName: jenkins-rotate-tracking-events-keys
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # The tracking-events-rotate-keys job uses these.
+              # The IAM user is hardcoded by name — it's the same user across all envs
+              # because tracking-events shares the user (yes, that's also bad).
+              - Effect: Allow
+                Action:
+                  - iam:CreateAccessKey
+                  - iam:DeleteAccessKey
+                  - iam:ListAccessKeys
+                  - iam:UpdateAccessKey
+                Resource: arn:aws:iam::111122223333:user/routebox-tracking-events
+              - Effect: Allow
+                Action:
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:UpdateSecret
+                Resource:
+                  Fn::Sub: arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:routebox/${EnvironmentName}/tracking-events/*
+        - PolicyName: jenkins-s3-customer-portal-sync
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource:
+                  - arn:aws:s3:::routebox-customer-portal-prod
+                  - arn:aws:s3:::routebox-customer-portal-prod/*
+                  - arn:aws:s3:::routebox-customer-portal-staging
+                  - arn:aws:s3:::routebox-customer-portal-staging/*
+                  - arn:aws:s3:::routebox-customer-portal-dev
+                  - arn:aws:s3:::routebox-customer-portal-dev/*
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                Resource: '*'  # TODO scope this down
+        - PolicyName: jenkins-cloudwatch-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: '*'
+        - PolicyName: jenkins-secrets-read
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Jenkins reads secrets to inject into task definitions during deploy.
+              # Including the tracking-events long-lived keys (see handover note).
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:ListSecrets
+                # TODO scope this down — should be routebox/* only
+                Resource: '*'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Component
+          Value: jenkins
+
+  JenkinsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub routebox-${EnvironmentName}-jenkins
+      Roles:
+        - !Ref JenkinsInstanceRole
+
+  # ---------------------------------------------------------------------------
+  # RDS enhanced monitoring role. AWS-managed policy attached. Kept simple.
+  # ---------------------------------------------------------------------------
+
+  RdsMonitoringRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub routebox-${EnvironmentName}-rds-monitoring
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: monitoring.rds.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+Outputs:
+
+  EcsTaskExecutionRoleArn:
+    Value: !GetAtt EcsTaskExecutionRole.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-ecs-task-execution-role-arn
+
+  ShipmentsApiTaskRoleArn:
+    Value: !GetAtt ShipmentsApiTaskRole.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-shipments-api-role-arn
+
+  RouteOptimizerTaskRoleArn:
+    Value: !GetAtt RouteOptimizerTaskRole.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-route-optimizer-role-arn
+
+  CustomerPortalTaskRoleArn:
+    Value: !GetAtt CustomerPortalTaskRole.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-customer-portal-role-arn
+
+  OpsConsoleTaskRoleArn:
+    Value: !GetAtt OpsConsoleTaskRole.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-ops-console-role-arn
+
+  JenkinsInstanceProfileArn:
+    Value: !GetAtt JenkinsInstanceProfile.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-jenkins-instance-profile-arn
+
+  JenkinsRoleArn:
+    Value: !GetAtt JenkinsInstanceRole.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-jenkins-role-arn
+
+  RdsMonitoringRoleArn:
+    # Older grandfathered export name — predates the routebox-<env>-<resource>
+    # convention. rds/template.yaml imports this exact name. Don't rename.
+    Value: !GetAtt RdsMonitoringRole.Arn
+    Export:
+      Name:
+        Fn::Sub: ${EnvironmentName}-rds-monitoring-role

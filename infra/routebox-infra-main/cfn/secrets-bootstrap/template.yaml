@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Routebox baseline secrets + the KMS key apps use to decrypt them. Apps pull
+  these via the in-container bootstrap script at task start. There are also
+  a few orphaned secrets in the live account from services that no longer
+  exist — cleaning them up requires checking with each app team. Nobody has.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+
+  AppSecretsKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: !Sub Routebox ${EnvironmentName} app secrets KMS key
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnableIAM
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+          - Sid: AllowEcsTaskExecutionDecrypt
+            Effect: Allow
+            Principal:
+              AWS:
+                - !ImportValue
+                  Fn::Sub: routebox-${EnvironmentName}-ecs-task-execution-role-arn
+            Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+            Resource: '*'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AppSecretsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/routebox-${EnvironmentName}-app-secrets
+      TargetKeyId: !Ref AppSecretsKey
+
+  # ---------------------------------------------------------------------------
+  # Baseline secrets. Every app expects these to exist at boot. Real values
+  # are written outside CFN — the resource here just creates the secret name
+  # with a placeholder, then a platform engineer rotates in a real value.
+  #
+  # Yes, "GenerateSecretString" with a placeholder template is a smell. The
+  # apps are tolerant of restart-on-rotation because the bootstrap re-pulls.
+  # ---------------------------------------------------------------------------
+
+  DatabaseUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub routebox/${EnvironmentName}/DATABASE_URL
+      Description: Postgres connection string. Written by hand after rds stack deploys.
+      KmsKeyId: !Ref AppSecretsKey
+      SecretString: 'postgres://placeholder:placeholder@placeholder:5432/routebox'
+
+  InternalApiTokenSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub routebox/${EnvironmentName}/INTERNAL_API_TOKEN
+      Description: Shared bearer token for service-to-service calls (shipments-api <-> ops-console).
+      KmsKeyId: !Ref AppSecretsKey
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
+
+  JwtSigningSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub routebox/${EnvironmentName}/JWT_SIGNING_KEY
+      Description: HS256 signing key for ops-console session tokens.
+      KmsKeyId: !Ref AppSecretsKey
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
+
+  CarrierWebhookSigningSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub routebox/${EnvironmentName}/CARRIER_WEBHOOK_SIGNING_KEY
+      Description: HMAC key tracking-events uses to verify carrier webhook signatures.
+      KmsKeyId: !Ref AppSecretsKey
+      SecretString: 'placeholder-rotate-me'
+
+  TrackingEventsAccessKeyId:
+    # The long-lived AWS access key for the tracking-events IAM user. Yes.
+    # Read notes/handover.md "tracking-events" for the why. Rotated by the
+    # tracking-events-rotate-keys Jenkins job.
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub routebox/${EnvironmentName}/tracking-events/AWS_ACCESS_KEY_ID
+      Description: tracking-events long-lived access key id. Rotated quarterly by Jenkins.
+      KmsKeyId: !Ref AppSecretsKey
+      SecretString: 'placeholder-AKIA-rotate-me'
+
+  TrackingEventsSecretAccessKey:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub routebox/${EnvironmentName}/tracking-events/AWS_SECRET_ACCESS_KEY
+      Description: tracking-events long-lived secret access key. Rotated quarterly by Jenkins.
+      KmsKeyId: !Ref AppSecretsKey
+      SecretString: 'placeholder-rotate-me'
+
+  SmtpPasswordSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub routebox/${EnvironmentName}/SMTP_PASSWORD
+      Description: SES SMTP password used by ops-console for outbound email.
+      KmsKeyId: !Ref AppSecretsKey
+      SecretString: 'placeholder-rotate-me'
+
+Outputs:
+
+  AppSecretsKeyId:
+    Value: !Ref AppSecretsKey
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-app-secrets-key-id
+
+  AppSecretsKeyArn:
+    Value: !GetAtt AppSecretsKey.Arn
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-app-secrets-key-arn
+
+  DatabaseUrlSecretArn:
+    Value: !Ref DatabaseUrlSecret
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-secret-database-url
+
+  InternalApiTokenSecretArn:
+    Value: !Ref InternalApiTokenSecret
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-secret-internal-api-token
+
+  JwtSigningSecretArn:
+    Value: !Ref JwtSigningSecret
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-secret-jwt-signing-key
+
+  CarrierWebhookSigningSecretArn:
+    Value: !Ref CarrierWebhookSigningSecret
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-secret-carrier-webhook-key

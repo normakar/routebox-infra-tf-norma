@@ -1,0 +1,25 @@
+[
+  { "ParameterKey": "EnvironmentName",     "ParameterValue": "staging" },
+  { "ParameterKey": "CostCenter",          "ParameterValue": "platform-staging" },
+
+  { "ParameterKey": "VpcCidr",             "ParameterValue": "10.20.0.0/16" },
+  { "ParameterKey": "PublicSubnet1Cidr",   "ParameterValue": "10.20.0.0/22" },
+  { "ParameterKey": "PublicSubnet2Cidr",   "ParameterValue": "10.20.4.0/22" },
+  { "ParameterKey": "PublicSubnet3Cidr",   "ParameterValue": "10.20.8.0/22" },
+  { "ParameterKey": "PrivateSubnet1Cidr",  "ParameterValue": "10.20.16.0/20" },
+  { "ParameterKey": "PrivateSubnet2Cidr",  "ParameterValue": "10.20.32.0/20" },
+  { "ParameterKey": "PrivateSubnet3Cidr",  "ParameterValue": "10.20.48.0/20" },
+
+  { "ParameterKey": "AccountIdHardcoded",  "ParameterValue": "111122223333" },
+
+  { "ParameterKey": "AcmCertificateArn",   "ParameterValue": "arn:aws:acm:us-east-1:111122223333:certificate/staging-placeholder-uuid" },
+  { "ParameterKey": "LogRetentionDays",    "ParameterValue": "14" },
+
+  { "ParameterKey": "DbInstanceClass",     "ParameterValue": "db.t3.medium" },
+  { "ParameterKey": "DbAllocatedStorage",  "ParameterValue": "100" },
+  { "ParameterKey": "DbEngineVersion",     "ParameterValue": "14.10" },
+  { "ParameterKey": "DbMasterUsername",    "ParameterValue": "routebox_admin" },
+  { "ParameterKey": "DbMasterPassword",    "ParameterValue": "ChangeMe-staging-not-real-password" },
+  { "ParameterKey": "MultiAz",             "ParameterValue": "false" },
+  { "ParameterKey": "BackupRetentionDays", "ParameterValue": "7" }
+]

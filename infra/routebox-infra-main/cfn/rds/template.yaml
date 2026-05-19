@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Routebox shared Postgres. Single instance per env (no read replica, no
+  Multi-AZ in dev/staging). Owned on paper by ops-console; in practice three
+  services touch it. Subnet group, parameter group, the instance itself.
+
+# IMPORTANT: prod has a hand-edit on max_connections in the parameter group
+# that is NOT reflected in this template. If you redeploy this stack cleanly,
+# re-apply max_connections=400 to the prod parameter group AFTER the deploy
+# completes. See notes/handover.md "rds" section.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+  DbInstanceClass:
+    Type: String
+    Default: db.t3.medium
+    Description: >
+      Right-sized for staging. Prod overrides to db.m5.xlarge via params/prod.json.
+      Dev runs on db.t3.small.
+
+  DbAllocatedStorage:
+    Type: Number
+    Default: 100
+    MinValue: 20
+    MaxValue: 1000
+
+  DbEngineVersion:
+    Type: String
+    # Pinned. Don't bump without coordinating with ops-console — Rails 6 +
+    # the unmaintained strong_migrations gem doesn't play with newer versions.
+    Default: '14.10'
+
+  DbMasterUsername:
+    Type: String
+    Default: routebox_admin
+    NoEcho: false
+
+  DbMasterPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: >
+      Master password. Comes in via the params file (yes, technically a
+      secret in a params file — there are two and we said we wouldn't add
+      more). Long-term plan is to manage via Secrets Manager rotation.
+
+  MultiAz:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+
+  BackupRetentionDays:
+    Type: Number
+    Default: 7
+
+Conditions:
+  IsProd: !Equals [!Ref EnvironmentName, prod]
+
+Resources:
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub routebox-${EnvironmentName}-db-subnets
+      DBSubnetGroupDescription: !Sub Routebox ${EnvironmentName} private subnets for RDS
+      SubnetIds:
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-private-subnet-1
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-private-subnet-2
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-private-subnet-3
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Parameter group. NOTE the comment at the top of this file: prod has a
+  # hand-edit to max_connections (=400) that is NOT in this template.
+  # Re-apply it manually after any clean redeploy.
+  DbParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: !Sub Routebox ${EnvironmentName} Postgres parameter group
+      Family: postgres14
+      Parameters:
+        log_statement: ddl
+        log_min_duration_statement: '1000'
+        log_connections: '1'
+        log_disconnections: '1'
+        # max_connections is intentionally NOT set here. Default is fine for
+        # dev/staging. Prod's been hand-edited to 400.
+        # Default rds.force_ssl is on — left as the engine default. Don't toggle.
+        idle_in_transaction_session_timeout: '600000'
+        statement_timeout: '60000'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub routebox-${EnvironmentName}
+      Engine: postgres
+      EngineVersion: !Ref DbEngineVersion
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      MasterUsername: !Ref DbMasterUsername
+      MasterUserPassword: !Ref DbMasterPassword
+      DBName: routebox
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DBParameterGroupName: !Ref DbParameterGroup
+      VPCSecurityGroups:
+        - !ImportValue
+          Fn::Sub: routebox-${EnvironmentName}-rds-sg-id
+      MultiAZ: !Ref MultiAz
+      BackupRetentionPeriod: !Ref BackupRetentionDays
+      PreferredBackupWindow: 06:00-06:30
+      PreferredMaintenanceWindow: sun:07:00-sun:07:30
+      AutoMinorVersionUpgrade: false
+      DeletionProtection: !If [IsProd, true, false]
+      EnablePerformanceInsights: !If [IsProd, true, false]
+      PerformanceInsightsRetentionPeriod: !If [IsProd, 7, !Ref AWS::NoValue]
+      MonitoringInterval: !If [IsProd, 60, 0]
+      MonitoringRoleArn: !If
+        - IsProd
+        - !ImportValue
+          Fn::Sub: ${EnvironmentName}-rds-monitoring-role
+        - !Ref AWS::NoValue
+      CopyTagsToSnapshot: true
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub routebox-${EnvironmentName}
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+
+  DbEndpoint:
+    Value: !GetAtt DbInstance.Endpoint.Address
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-db-endpoint
+
+  DbPort:
+    Value: !GetAtt DbInstance.Endpoint.Port
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-db-port
+
+  DbInstanceIdentifier:
+    Value: !Ref DbInstance
+    Export:
+      Name: !Sub routebox-${EnvironmentName}-db-id
